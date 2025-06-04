@@ -28,7 +28,7 @@ import { verificarYActualizarContactoSiEsNecesario, detectarIntencionContactoIA 
 import { actualizarHistorialConversacion } from '../../funciones/helpers/historialConversacion.mjs';
 
 // IMPORTANTE: Cache de contactos (nuevo sistema)
-import { getContactoByTelefono, getCacheContactos, actualizarContactoEnCache } from '../../funciones/helpers/cacheContactos.mjs'
+import { getContactoByTelefono, getCacheContactos, actualizarContactoEnCache, cargarContactosDesdeAppSheet } from '../../funciones/helpers/cacheContactos.mjs'
 
 export function extraerNombreProductoDeVision(texto) {
   const match = texto.match(/["“](.*?)["”]/)
