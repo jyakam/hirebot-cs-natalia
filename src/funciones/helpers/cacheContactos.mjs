@@ -3,34 +3,57 @@ import { APPSHEETCONFIG } from '../../config/bot.mjs'
 import { CONTACTOS } from '../../config/bot.mjs'
 
 const CACHE = { LISTA_CONTACTOS: [] }
+let cargaEnCurso = null // <- NUEVO: Promesa de carga en curso
+
 console.log('🗃️ [CACHE_CONTACTOS] Inicializando caché de contactos')
 
+/**
+ * Función blindada: Si ya hay una carga en curso, espera a que termine.
+ * Si no hay carga, inicia una nueva y todos los que llamen después esperan la misma promesa.
+ */
 export async function cargarContactosDesdeAppSheet() {
-  try {
-    console.log('🔄 [CACHE_CONTACTOS] Intentando cargar contactos desde AppSheet');
-    console.log(`🌐 [CACHE_CONTACTOS] Usando tabla: ${process.env.PAG_CONTACTOS || 'No definida'}`);
-    if (!process.env.PAG_CONTACTOS) {
-      console.error('❌ [CACHE_CONTACTOS] PAG_CONTACTOS no está definida');
-      return;
+  if (cargaEnCurso) {
+    console.log('⏳ [CACHE_CONTACTOS] Carga de contactos en curso, esperando a que termine...')
+    try {
+      await cargaEnCurso
+      console.log('✅ [CACHE_CONTACTOS] Espera terminada, carga previa finalizada.')
+    } catch (e) {
+      console.error('❌ [CACHE_CONTACTOS] Error esperando carga previa:', e)
     }
-    const datos = await getTable(APPSHEETCONFIG, process.env.PAG_CONTACTOS);
-    console.log(`📥 [CACHE_CONTACTOS] Datos crudos recibidos:`, datos);
-    if (Array.isArray(datos)) {
-      CACHE.LISTA_CONTACTOS = datos;
-      console.log(`🗃️ [CACHE_CONTACTOS] Cache actualizado (${CACHE.LISTA_CONTACTOS.length} registros)`);
-      CONTACTOS.LISTA_CONTACTOS = [...CACHE.LISTA_CONTACTOS];
-      console.log(`🗃️ [CACHE_CONTACTOS] Sincronizado con CONTACTOS: ${CONTACTOS.LISTA_CONTACTOS.length} contactos`);
-    } else {
-      console.warn('⚠️ [CACHE_CONTACTOS] Datos inválidos:', datos);
+    return
+  }
+
+  cargaEnCurso = (async () => {
+    try {
+      console.log('🔄 [CACHE_CONTACTOS] Intentando cargar contactos desde AppSheet');
+      console.log(`🌐 [CACHE_CONTACTOS] Usando tabla: ${process.env.PAG_CONTACTOS || 'No definida'}`);
+      if (!process.env.PAG_CONTACTOS) {
+        console.error('❌ [CACHE_CONTACTOS] PAG_CONTACTOS no está definida');
+        return;
+      }
+      const datos = await getTable(APPSHEETCONFIG, process.env.PAG_CONTACTOS);
+      console.log(`📥 [CACHE_CONTACTOS] Datos crudos recibidos:`, datos);
+      if (Array.isArray(datos)) {
+        CACHE.LISTA_CONTACTOS = datos;
+        console.log(`🗃️ [CACHE_CONTACTOS] Cache actualizado (${CACHE.LISTA_CONTACTOS.length} registros)`);
+        CONTACTOS.LISTA_CONTACTOS = [...CACHE.LISTA_CONTACTOS];
+        console.log(`🗃️ [CACHE_CONTACTOS] Sincronizado con CONTACTOS: ${CONTACTOS.LISTA_CONTACTOS.length} contactos`);
+      } else {
+        console.warn('⚠️ [CACHE_CONTACTOS] Datos inválidos:', datos);
+        CACHE.LISTA_CONTACTOS = [];
+        CONTACTOS.LISTA_CONTACTOS = [];
+      }
+    } catch (e) {
+      console.error('❌ [CACHE_CONTACTOS] Error cargando contactos:', e.message, e.stack);
       CACHE.LISTA_CONTACTOS = [];
       CONTACTOS.LISTA_CONTACTOS = [];
+    } finally {
+      cargaEnCurso = null // <- IMPORTANTE: Limpiar el flag cuando termina (éxito o error)
+      console.log(`🗃️ [CACHE_CONTACTOS] Estado final: ${CACHE.LISTA_CONTACTOS.length} contactos`);
     }
-  } catch (e) {
-    console.error('❌ [CACHE_CONTACTOS] Error cargando contactos:', e.message, e.stack);
-    CACHE.LISTA_CONTACTOS = [];
-    CONTACTOS.LISTA_CONTACTOS = [];
-  }
-  console.log(`🗃️ [CACHE_CONTACTOS] Estado final: ${CACHE.LISTA_CONTACTOS.length} contactos`);
+  })()
+
+  await cargaEnCurso
 }
 
 export function getContactoByTelefono(telefono) {
